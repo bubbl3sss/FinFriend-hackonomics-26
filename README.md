@@ -24,5 +24,5 @@ Machine Learning Pipeline
 -100 Decision trees to minimize variance and handle non-linear financial relationships.
 -Streamlit for deployment
 
-## LINK TO APP: 
+## LINK TO KAGGLE NOTEBOOK: https://www.kaggle.com/code/bubbl3ss/finfriend-hackonomics-26
 
