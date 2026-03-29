@@ -3,96 +3,74 @@ import pandas as pd
 import numpy as np
 import pickle
 import matplotlib.pyplot as plt
+import urllib.request
+import os
 
-# 1. Page Configuration
+# 1. Page Config
 st.set_page_config(page_title="FinFriend", layout="centered")
 
-# 2. Model Loading with Error Handling
+# 2. THE CLOUD LOADER (Bypasses GitHub Size Limits)
 @st.cache_resource
-def load_finfriend_model():
+def load_model_from_url():
+    model_path = 'finfriend_model.pkl'
+    
+    # If the model isn't in the repo, download it from your direct link
+    if not os.path.exists(model_path):
+        # REPLACE THE URL BELOW with your direct download link
+        # For Google Drive, use: https://drive.google.com/uc?export=download&id=YOUR_FILE_ID
+        url = 'https://drive.google.com/file/d/1Zp_XWjNj6gH6KJpvhr8mMvjl-kTHc6EF/view?usp=drive_link'
+        try:
+            with st.spinner('Loading AI Brain from Cloud...'):
+                urllib.request.urlretrieve(url, model_path)
+        except Exception as e:
+            st.error(f"Download Failed: {e}")
+            return None
+
     try:
-        with open('finfriend_model.pkl', 'rb') as f:
+        with open(model_path, 'rb') as f:
             return pickle.load(f)
     except Exception as e:
+        st.error(f"Model Error: {e}")
         return None
 
-model = load_finfriend_model()
+model = load_model_from_url()
 
 # 3. Sidebar Inputs
 st.sidebar.title("User Profile")
-
-income = st.sidebar.number_input("Monthly Income", min_value=5000, value=50000, step=1000)
+income = st.sidebar.number_input("Monthly Income", min_value=5000, value=50000)
 age = st.sidebar.slider("Age", 18, 80, 25)
-dependents = st.sidebar.selectbox("Dependents", [0, 1, 2, 3, 4, 5])
-
 occ_label = st.sidebar.selectbox("Occupation", ['Student', 'Professional', 'Self_Employed', 'Retired'])
 city_label = st.sidebar.selectbox("City Category", ['Tier_1', 'Tier_2', 'Tier_3'])
 
-st.sidebar.subheader("Monthly Outgoings")
-rent = st.sidebar.number_input("Rent or EMI", value=10000)
-loan = st.sidebar.number_input("Loan Repayments", value=0)
+st.sidebar.subheader("Outgoings")
+rent = st.sidebar.number_input("Rent", value=10000)
+loan = st.sidebar.number_input("Loan", value=0)
 insurance = st.sidebar.number_input("Insurance", value=2000)
 
-# 4. Data Processing
+# 4. Processing
 occ_map = {'Student': 0, 'Professional': 1, 'Self_Employed': 2, 'Retired': 3}
 city_map = {'Tier_1': 1, 'Tier_2': 2, 'Tier_3': 3}
-age_factor = age / 100
 
-# Feature array (must match training order)
 features = np.array([[
-    income, age_factor, dependents, 
+    income, age/100, 0, # age_factor and placeholder for dependents
     occ_map[occ_label], city_map[city_label], 
     rent, loan, insurance
 ]])
 
-# 5. Main App Logic
+# 5. UI Logic
 st.title("FinFriend")
-st.write("AI Financial Intelligence System")
 
 if st.button("Analyze Finances"):
     if model:
-        # ML Prediction
         prediction = model.predict(features)[0]
+        st.metric("Target Monthly Savings", f"INR {prediction:,.0f}")
         
-        # Resilience Logic
-        fixed_costs = rent + loan + insurance
-        disposable = income - fixed_costs
-        savings_ratio = (disposable / income) * 100 if income > 0 else 0
-        resilience = (savings_ratio * 0.7) + (age_factor * 30)
-        
-        # Dashboard Display
-        st.write("### Financial Diagnostics")
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.metric(label="Target Monthly Savings", value=f"INR {prediction:,.0f}")
-            
-        with col2:
-            st.metric(label="Resilience Score", value=f"{resilience:.1f}/100")
-            if resilience > 65:
-                st.success("Status: High Stability")
-            elif resilience > 40:
-                st.warning("Status: Moderate Risk")
-            else:
-                st.error("Status: High Vulnerability")
-
-        # Visual Chart with Memory Management
-        st.markdown("#### Budget Composition")
-        labels = ['Target Savings', 'Fixed Costs', 'Other']
-        others = max(0, income - prediction - fixed_costs)
-        sizes = [prediction, fixed_costs, others]
-        colors = ['#2ecc71', '#e74c3c', '#3498db']
-        
-        fig, ax = plt.subplots(figsize=(6, 3))
-        ax.pie(sizes, labels=labels, autopct='%1.1f%%', startangle=140, colors=colors)
-        ax.axis('equal') 
+        # Simple Chart
+        fig, ax = plt.subplots()
+        ax.pie([prediction, (rent+loan+insurance)], labels=['Savings', 'Costs'])
         st.pyplot(fig)
-        plt.close(fig) # CRITICAL: This prevents the 'Unresponsive' crash
-
-        st.divider()
-        st.write("#### Recommendation")
-        st.write(f"For a {occ_label} in a {city_label} city, target a savings rate of INR {prediction:,.0f}. Reducing your INR {fixed_costs:,.0f} fixed costs will improve your Resilience Score.")
+        plt.close(fig)
     else:
-        st.error("Model file not found. Check if finfriend_model.pkl is in the main folder.")
+        st.warning("Please check your Model URL in the code.")
 
 st.caption("FinFriend | Hackonomics 2026")
